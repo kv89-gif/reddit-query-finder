@@ -18,7 +18,7 @@ def clean_html(text):
 
 def search_reddit(query, sort='relevance', time_filter='all', limit=25):
     """
-    Search Reddit using the JSON API
+    Search Reddit using the JSON API with detailed logging
     """
     try:
         # Clean and encode the query
@@ -36,42 +36,94 @@ def search_reddit(query, sort='relevance', time_filter='all', limit=25):
         }
         
         headers = {
-            'User-Agent': 'RedditQueryFinder/1.0'
+            'User-Agent': 'RedditQueryFinder/1.0 (compatible; Python/requests)'
         }
         
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        # Debug information
+        full_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
+        st.info(f"🔍 Searching: {full_url}")
+        
+        # Make the request
+        response = requests.get(url, params=params, headers=headers, timeout=15)
+        
+        # Log response details
+        st.info(f"📡 Response Status: {response.status_code}")
+        st.info(f"📊 Response Size: {len(response.content)} bytes")
+        
+        # Check for rate limiting
+        if response.status_code == 429:
+            st.error("🚫 Rate limited by Reddit. Please wait a moment and try again.")
+            return []
+        
         response.raise_for_status()
         
-        data = response.json()
+        # Parse JSON
+        try:
+            data = response.json()
+            st.success("✅ Successfully parsed JSON response")
+        except json.JSONDecodeError as e:
+            st.error(f"❌ JSON Parse Error: {str(e)}")
+            st.error(f"Response content preview: {response.text[:200]}...")
+            return []
         
+        # Debug: Show JSON structure
+        if st.checkbox("🔍 Show Raw JSON Structure (Debug)", key="debug_json"):
+            st.json(data)
+        
+        # Process results
         posts = []
         if 'data' in data and 'children' in data['data']:
-            for post in data['data']['children']:
-                post_data = post['data']
-                
-                # Extract relevant information
-                post_info = {
-                    'title': clean_html(post_data.get('title', '')),
-                    'subreddit': post_data.get('subreddit', ''),
-                    'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
-                    'score': post_data.get('score', 0),
-                    'num_comments': post_data.get('num_comments', 0),
-                    'created_utc': post_data.get('created_utc', 0),
-                    'selftext': clean_html(post_data.get('selftext', ''))[:200] + '...' if post_data.get('selftext') else '',
-                    'author': post_data.get('author', '[deleted]')
-                }
-                posts.append(post_info)
+            children = data['data']['children']
+            st.info(f"📝 Found {len(children)} posts in response")
+            
+            for i, post in enumerate(children):
+                try:
+                    post_data = post['data']
+                    
+                    # Extract relevant information
+                    post_info = {
+                        'title': clean_html(post_data.get('title', '')),
+                        'subreddit': post_data.get('subreddit', ''),
+                        'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
+                        'score': post_data.get('score', 0),
+                        'num_comments': post_data.get('num_comments', 0),
+                        'created_utc': post_data.get('created_utc', 0),
+                        'selftext': clean_html(post_data.get('selftext', ''))[:200] + '...' if post_data.get('selftext') else '',
+                        'author': post_data.get('author', '[deleted]')
+                    }
+                    posts.append(post_info)
+                except Exception as e:
+                    st.warning(f"⚠️ Error processing post {i+1}: {str(e)}")
+                    continue
+        else:
+            st.warning("⚠️ No 'data' or 'children' found in response")
+            if 'error' in data:
+                st.error(f"Reddit API Error: {data['error']}")
         
         return posts
         
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Request timed out. Reddit might be slow. Try again.")
+        return []
+    except requests.exceptions.ConnectionError:
+        st.error("🌐 Connection error. Check your internet connection.")
+        return []
+    except requests.exceptions.HTTPError as e:
+        st.error(f"🚫 HTTP Error {e.response.status_code}: {str(e)}")
+        if e.response.status_code == 403:
+            st.error("Access forbidden. Reddit might be blocking requests.")
+        elif e.response.status_code == 404:
+            st.error("Reddit API endpoint not found.")
+        return []
     except requests.exceptions.RequestException as e:
-        st.error(f"Error connecting to Reddit: {str(e)}")
+        st.error(f"📡 Request Error: {str(e)}")
         return []
     except json.JSONDecodeError as e:
-        st.error("Error parsing Reddit response")
+        st.error(f"📄 JSON Parse Error: {str(e)}")
         return []
     except Exception as e:
-        st.error(f"Unexpected error: {str(e)}")
+        st.error(f"❌ Unexpected error: {str(e)}")
+        st.error(f"Error type: {type(e).__name__}")
         return []
 
 def extract_keywords(text):
@@ -95,6 +147,9 @@ def main():
     
     # Sidebar for settings
     st.sidebar.header("Search Settings")
+    
+    # Debug mode toggle
+    debug_mode = st.sidebar.checkbox("🔧 Debug Mode", help="Show detailed logging and API responses")
     
     sort_options = {
         'Relevance': 'relevance',
@@ -156,6 +211,15 @@ def main():
     
     # Search results
     if search_button and search_query:
+        st.header("🔍 Search Details")
+        
+        # Show search parameters
+        with st.expander("Search Parameters", expanded=debug_mode):
+            st.write(f"**Query:** {search_query}")
+            st.write(f"**Sort:** {sort_by}")
+            st.write(f"**Time Filter:** {time_filter}")
+            st.write(f"**Results Limit:** {num_results}")
+        
         with st.spinner("Searching Reddit..."):
             results = search_reddit(
                 search_query, 
