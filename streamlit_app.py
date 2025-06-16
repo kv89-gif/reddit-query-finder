@@ -33,7 +33,7 @@ def generate_reddit_search_links(keywords, time_filter=None):
 
 
 def main():
-    st.title("Reddit Query Finder 🧠")
+    st.title("Reddit Query Finder")
     st.markdown("Paste your content and get Reddit search links for threads where you can respond.")
 
     user_text = st.text_area("Enter your paragraph:", height=200)
