@@ -53,7 +53,8 @@ def main():
         if keywords:
             st.write(f"**Search keywords:** {', '.join(keywords)}")
 
-            if st.button("Show Reddit Search Links"):
+            search_button = st.button("Show Reddit Search Links")
+            if search_button:
                 search_links = generate_reddit_search_links(keywords, time_filter=time_filter)
 
                 if search_links:
@@ -61,10 +62,11 @@ def main():
                     for i, link in enumerate(search_links, 1):
                         st.markdown(f"{i}. [Search Reddit]({link})")
 
-                    st.markdown(f"<meta http-equiv='refresh' content='0; URL={search_links[0]}'>", unsafe_allow_html=True)
-
                     all_links_text = "\n".join(search_links)
                     st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
+
+                    st.markdown(f"🔗 First result will open below:")
+                    st.markdown(f"<iframe src='{search_links[0]}' width='100%' height='600'></iframe>", unsafe_allow_html=True)
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
 
