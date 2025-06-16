@@ -1,7 +1,13 @@
 import streamlit as st
 import requests
 import re
+import nltk
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer
 from urllib.parse import quote
+
+nltk.download('stopwords')
+
 
 def clean_html(text):
     if not text:
@@ -10,15 +16,14 @@ def clean_html(text):
     text = re.sub(clean, '', text)
     return text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
 
-def extract_keywords(text):
-    stop_words = set([
-        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are',
-        'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-        'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she',
-        'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'
-    ])
-    words = text.lower().split()
-    return [w for w in words if w not in stop_words and len(w) > 2][:10]
+
+def extract_top_keywords(text, top_n=10):
+    stop_words = set(stopwords.words('english'))
+    vectorizer = CountVectorizer(stop_words=stop_words, max_features=top_n)
+    X = vectorizer.fit_transform([text])
+    keywords = vectorizer.get_feature_names_out()
+    return list(keywords)
+
 
 def search_pushshift(query, limit=10):
     url = "https://api.pushshift.io/reddit/search/submission"
@@ -38,6 +43,7 @@ def search_pushshift(query, limit=10):
         st.error(f"Pushshift error: {e}")
     return []
 
+
 def main():
     st.title("Reddit Query Finder 🧠")
     st.markdown("Paste your content and get Reddit threads where you can respond.")
@@ -45,7 +51,7 @@ def main():
     user_text = st.text_area("Enter your paragraph:", height=200)
 
     if user_text:
-        keywords = extract_keywords(user_text)
+        keywords = extract_top_keywords(user_text)
         if keywords:
             query = " ".join(keywords)
             st.write(f"**Search query:** `{query}`")
@@ -62,6 +68,7 @@ def main():
                     st.warning("No relevant posts found.")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
+
 
 if __name__ == '__main__':
     main()
