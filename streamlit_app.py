@@ -65,8 +65,7 @@ def main():
                     all_links_text = "\n".join(search_links)
                     st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
 
-                    st.markdown(f"🔗 First result will open below:")
-                    st.markdown(f"<iframe src='{search_links[0]}' width='100%' height='600'></iframe>", unsafe_allow_html=True)
+                    st.markdown(f"🔗 [Open first result in new tab]({search_links[0]})")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
 
