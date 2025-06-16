@@ -16,115 +16,162 @@ def clean_html(text):
     text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"')
     return text
 
-def search_reddit(query, sort='relevance', time_filter='all', limit=25):
+def search_reddit_multiple_methods(query, sort='relevance', time_filter='all', limit=25):
     """
-    Search Reddit using the JSON API with detailed logging
+    Try multiple methods to search Reddit
     """
-    try:
-        # Clean and encode the query
-        encoded_query = quote(query)
-        
-        # Reddit search URL
-        url = f"https://www.reddit.com/search.json"
-        
-        params = {
-            'q': query,
-            'sort': sort,
-            't': time_filter,
-            'limit': limit,
-            'type': 'link'
-        }
-        
-        headers = {
-            'User-Agent': 'RedditQueryFinder/1.0 (compatible; Python/requests)'
-        }
-        
-        # Debug information
-        full_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
-        st.info(f"🔍 Searching: {full_url}")
-        
-        # Make the request
-        response = requests.get(url, params=params, headers=headers, timeout=15)
-        
-        # Log response details
-        st.info(f"📡 Response Status: {response.status_code}")
-        st.info(f"📊 Response Size: {len(response.content)} bytes")
-        
-        # Check for rate limiting
-        if response.status_code == 429:
-            st.error("🚫 Rate limited by Reddit. Please wait a moment and try again.")
-            return []
-        
-        response.raise_for_status()
-        
-        # Parse JSON
+    methods = [
+        ("Direct JSON API", search_reddit_json),
+        ("Subreddit Search", search_reddit_subreddit),
+        ("Alternative Headers", search_reddit_alt_headers),
+    ]
+    
+    for method_name, method_func in methods:
+        st.info(f"🔄 Trying method: {method_name}")
         try:
-            data = response.json()
-            st.success("✅ Successfully parsed JSON response")
-        except json.JSONDecodeError as e:
-            st.error(f"❌ JSON Parse Error: {str(e)}")
-            st.error(f"Response content preview: {response.text[:200]}...")
-            return []
-        
-        # Debug: Show JSON structure
-        if st.checkbox("🔍 Show Raw JSON Structure (Debug)", key="debug_json"):
-            st.json(data)
-        
-        # Process results
-        posts = []
-        if 'data' in data and 'children' in data['data']:
-            children = data['data']['children']
-            st.info(f"📝 Found {len(children)} posts in response")
+            results = method_func(query, sort, time_filter, limit)
+            if results:
+                st.success(f"✅ Success with method: {method_name}")
+                return results
+            else:
+                st.warning(f"⚠️ No results from method: {method_name}")
+        except Exception as e:
+            st.warning(f"❌ Method {method_name} failed: {str(e)}")
+            continue
+    
+    return []
+
+def search_reddit_json(query, sort='relevance', time_filter='all', limit=25):
+    """
+    Original JSON API method
+    """
+    url = "https://www.reddit.com/search.json"
+    
+    params = {
+        'q': query,
+        'sort': sort,
+        't': time_filter,
+        'limit': limit,
+        'type': 'link'
+    }
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
+    response = requests.get(url, params=params, headers=headers, timeout=15)
+    response.raise_for_status()
+    
+    data = response.json()
+    return process_reddit_data(data)
+
+def search_reddit_alt_headers(query, sort='relevance', time_filter='all', limit=25):
+    """
+    Try with different headers to avoid blocking
+    """
+    url = "https://www.reddit.com/search.json"
+    
+    params = {
+        'q': query,
+        'sort': sort,
+        't': time_filter,
+        'limit': limit,
+        'type': 'link'
+    }
+    
+    headers = {
+        'User-Agent': 'curl/7.68.0',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+    }
+    
+    response = requests.get(url, params=params, headers=headers, timeout=15)
+    response.raise_for_status()
+    
+    data = response.json()
+    return process_reddit_data(data)
+
+def search_reddit_subreddit(query, sort='relevance', time_filter='all', limit=25):
+    """
+    Search within popular subreddits that might be relevant
+    """
+    relevant_subreddits = ['AskReddit', 'NoStupidQuestions', 'explainlikeimfive', 'LifeProTips', 'YouShouldKnow']
+    all_posts = []
+    
+    for subreddit in relevant_subreddits:
+        try:
+            url = f"https://www.reddit.com/r/{subreddit}/search.json"
             
-            for i, post in enumerate(children):
-                try:
-                    post_data = post['data']
+            params = {
+                'q': query,
+                'restrict_sr': '1',
+                'sort': sort,
+                't': time_filter,
+                'limit': 5  # Fewer per subreddit
+            }
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; RedditSearchBot/1.0)'
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                posts = process_reddit_data(data)
+                all_posts.extend(posts)
+                
+                if len(all_posts) >= limit:
+                    break
                     
-                    # Extract relevant information
-                    post_info = {
-                        'title': clean_html(post_data.get('title', '')),
-                        'subreddit': post_data.get('subreddit', ''),
-                        'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
-                        'score': post_data.get('score', 0),
-                        'num_comments': post_data.get('num_comments', 0),
-                        'created_utc': post_data.get('created_utc', 0),
-                        'selftext': clean_html(post_data.get('selftext', ''))[:200] + '...' if post_data.get('selftext') else '',
-                        'author': post_data.get('author', '[deleted]')
-                    }
-                    posts.append(post_info)
-                except Exception as e:
-                    st.warning(f"⚠️ Error processing post {i+1}: {str(e)}")
-                    continue
-        else:
-            st.warning("⚠️ No 'data' or 'children' found in response")
-            if 'error' in data:
-                st.error(f"Reddit API Error: {data['error']}")
-        
-        return posts
-        
-    except requests.exceptions.Timeout:
-        st.error("⏱️ Request timed out. Reddit might be slow. Try again.")
-        return []
-    except requests.exceptions.ConnectionError:
-        st.error("🌐 Connection error. Check your internet connection.")
-        return []
-    except requests.exceptions.HTTPError as e:
-        st.error(f"🚫 HTTP Error {e.response.status_code}: {str(e)}")
-        if e.response.status_code == 403:
-            st.error("Access forbidden. Reddit might be blocking requests.")
-        elif e.response.status_code == 404:
-            st.error("Reddit API endpoint not found.")
-        return []
-    except requests.exceptions.RequestException as e:
-        st.error(f"📡 Request Error: {str(e)}")
-        return []
-    except json.JSONDecodeError as e:
-        st.error(f"📄 JSON Parse Error: {str(e)}")
-        return []
-    except Exception as e:
-        st.error(f"❌ Unexpected error: {str(e)}")
-        st.error(f"Error type: {type(e).__name__}")
-        return []
+        except Exception as e:
+            continue  # Try next subreddit
+    
+    return all_posts[:limit]
+
+def process_reddit_data(data):
+    """
+    Process Reddit JSON data into standardized format
+    """
+    posts = []
+    
+    if 'data' in data and 'children' in data['data']:
+        for post in data['data']['children']:
+            try:
+                post_data = post['data']
+                
+                post_info = {
+                    'title': clean_html(post_data.get('title', '')),
+                    'subreddit': post_data.get('subreddit', ''),
+                    'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
+                    'score': post_data.get('score', 0),
+                    'num_comments': post_data.get('num_comments', 0),
+                    'created_utc': post_data.get('created_utc', 0),
+                    'selftext': clean_html(post_data.get('selftext', ''))[:200] + '...' if post_data.get('selftext') else '',
+                    'author': post_data.get('author', '[deleted]')
+                }
+                posts.append(post_info)
+            except Exception:
+                continue
+    
+    return posts
+
+def generate_search_urls(query):
+    """
+    Generate manual search URLs as fallback
+    """
+    encoded_query = quote(query)
+    
+    urls = {
+        'Reddit Search': f"https://www.reddit.com/search/?q={encoded_query}",
+        'Google Site Search': f"https://www.google.com/search?q=site:reddit.com+{encoded_query}",
+        'DuckDuckGo Site Search': f"https://duckduckgo.com/?q=site:reddit.com+{encoded_query}",
+    }
+    
+    return urls
 
 def extract_keywords(text):
     """Extract potential keywords from the input text"""
@@ -221,7 +268,7 @@ def main():
             st.write(f"**Results Limit:** {num_results}")
         
         with st.spinner("Searching Reddit..."):
-            results = search_reddit(
+            results = search_reddit_multiple_methods(
                 search_query, 
                 sort=sort_options[sort_by], 
                 time_filter=time_filters[time_filter],
@@ -283,7 +330,25 @@ def main():
             )
             
         else:
-            st.warning("No results found. Try different keywords or adjust your search settings.")
+            st.warning("❌ All search methods failed. Here are some manual alternatives:")
+            
+            # Generate manual search URLs
+            search_urls = generate_search_urls(search_query)
+            
+            st.header("🔗 Manual Search Options")
+            st.markdown("Try these search links in your browser:")
+            
+            for search_name, search_url in search_urls.items():
+                st.markdown(f"**{search_name}:** [Open Search]({search_url})")
+                st.code(search_url)
+            
+            st.info("""
+            **Alternative Approaches:**
+            1. Use the manual search links above
+            2. Try shorter, more specific keywords
+            3. Search individual subreddits manually
+            4. Use Google with `site:reddit.com your keywords`
+            """)
     
     elif search_button and not search_query:
         st.error("Please enter a search query.")
