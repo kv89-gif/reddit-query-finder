@@ -64,7 +64,7 @@ def main():
                 if search_links:
                     st.success("Click the links below to search Reddit for related queries:")
                     for i, link in enumerate(search_links, 1):
-                    st.markdown(f"{i}. {link}")
+                        st.markdown(f"{i}. {link}")
 
                     all_links_text = "\n".join(search_links)
                     st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
@@ -72,7 +72,7 @@ def main():
                     top_links = search_links[:3]
                     st.markdown("**🔗 Open Top 3 Results in New Tabs:**")
                     for idx, top_link in enumerate(top_links, 1):
-                    st.markdown(f"{idx}. {top_link}")
+                        st.markdown(f"{idx}. {top_link}")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
 
