@@ -1,12 +1,7 @@
 import streamlit as st
 import requests
 import re
-import nltk
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import CountVectorizer
 from urllib.parse import quote
-
-nltk.download('stopwords')
 
 
 def clean_html(text):
@@ -18,11 +13,19 @@ def clean_html(text):
 
 
 def extract_top_keywords(text, top_n=10):
-    stop_words = set(stopwords.words('english'))
-    vectorizer = CountVectorizer(stop_words=stop_words, max_features=top_n)
-    X = vectorizer.fit_transform([text])
-    keywords = vectorizer.get_feature_names_out()
-    return list(keywords)
+    stop_words = set([
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are',
+        'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+        'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she',
+        'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'
+    ])
+    words = re.findall(r'\b\w+\b', text.lower())
+    keywords = [word for word in words if word not in stop_words and len(word) > 2]
+    freq = {}
+    for word in keywords:
+        freq[word] = freq.get(word, 0) + 1
+    sorted_keywords = sorted(freq.items(), key=lambda item: item[1], reverse=True)
+    return [kw[0] for kw in sorted_keywords[:top_n]]
 
 
 def search_pushshift(query, limit=10):
