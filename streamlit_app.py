@@ -19,7 +19,7 @@ def extract_top_keywords(text, top_n=10):
     return [kw[0] for kw in sorted_keywords[:top_n]]
 
 
-def generate_reddit_search_links(keywords):
+def generate_reddit_search_links(keywords, time_filter=None):
     base_url = "https://www.reddit.com/search/?q="
     phrases = []
     # Generate combinations of 2-4 keyword phrases
@@ -28,6 +28,8 @@ def generate_reddit_search_links(keywords):
             phrase = " ".join(keywords[i:j+1])
             phrases.append(phrase)
     unique_phrases = list(dict.fromkeys(phrases))  # Remove duplicates while preserving order
+    if time_filter:
+        return [f"{base_url}{quote(p)}&t={time_filter}" for p in unique_phrases]
     return [f"{base_url}{quote(p)}" for p in unique_phrases]
 
 
@@ -38,15 +40,35 @@ def main():
     user_text = st.text_area("Enter your paragraph:", height=200)
 
     if user_text:
+        time_filter_map = {
+            "Any time": None,
+            "Past 24 hours": "day",
+            "Past week": "week",
+            "Past month": "month",
+            "Past 6 months": "6months"
+        }
+        selected_time = st.selectbox("Filter posts by time:", list(time_filter_map.keys()), index=0)
+        time_filter = time_filter_map[selected_time]
+
         keywords = extract_top_keywords(user_text)
         if keywords:
             st.write(f"**Search keywords:** {', '.join(keywords)}")
 
-            if st.button("Show Reddit Search Links"):
-                search_links = generate_reddit_search_links(keywords)
-                st.success("Click the links below to search Reddit for related queries:")
-                for i, link in enumerate(search_links, 1):
-                    st.markdown(f"{i}. [Search Reddit]({link})")
+                        if st.button("Show Reddit Search Links"):
+                search_links = generate_reddit_search_links(keywords, time_filter=time_filter)
+
+                if search_links:
+                    st.success("Click the links below to search Reddit for related queries:")
+                    for i, link in enumerate(search_links, 1):
+                        st.markdown(f"{i}. [Search Reddit]({link})")
+
+                    # Auto-open the top search link
+                    st.markdown(f"<meta http-equiv='refresh' content='0; URL={search_links[0]}'>", unsafe_allow_html=True)
+
+                    # Add a copy-all button
+                    all_links_text = "
+".join(search_links)
+                    st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
 
