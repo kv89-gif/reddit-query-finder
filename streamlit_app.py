@@ -55,6 +55,10 @@ def main():
 
             search_button = st.button("Show Reddit Search Links")
             if search_button:
+                subreddit_filter = st.text_input("Limit to subreddit (optional, e.g. HomeImprovement):", "")
+                if subreddit_filter:
+                    keywords = [f"{kw} subreddit:{subreddit_filter}" for kw in keywords]
+
                 search_links = generate_reddit_search_links(keywords, time_filter=time_filter)
 
                 if search_links:
@@ -65,7 +69,11 @@ def main():
                     all_links_text = "\n".join(search_links)
                     st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
 
-                    st.markdown(f"🔗 [Open first result in new tab]({search_links[0]})")
+                    top_links = search_links[:3]
+                    st.markdown("
+**🔗 Open Top 3 Results in New Tabs:**")
+                    for idx, top_link in enumerate(top_links, 1):
+                        st.markdown(f"{idx}. [Open Link]({top_link})")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
 
