@@ -22,12 +22,11 @@ def extract_top_keywords(text, top_n=10):
 def generate_reddit_search_links(keywords, time_filter=None):
     base_url = "https://www.reddit.com/search/?q="
     phrases = []
-    # Generate combinations of 2-4 keyword phrases
     for i in range(len(keywords)):
         for j in range(i + 1, min(i + 4, len(keywords))):
             phrase = " ".join(keywords[i:j+1])
             phrases.append(phrase)
-    unique_phrases = list(dict.fromkeys(phrases))  # Remove duplicates while preserving order
+    unique_phrases = list(dict.fromkeys(phrases))
     if time_filter:
         return [f"{base_url}{quote(p)}&t={time_filter}" for p in unique_phrases]
     return [f"{base_url}{quote(p)}" for p in unique_phrases]
@@ -54,7 +53,7 @@ def main():
         if keywords:
             st.write(f"**Search keywords:** {', '.join(keywords)}")
 
-                        if st.button("Show Reddit Search Links"):
+            if st.button("Show Reddit Search Links"):
                 search_links = generate_reddit_search_links(keywords, time_filter=time_filter)
 
                 if search_links:
@@ -62,12 +61,9 @@ def main():
                     for i, link in enumerate(search_links, 1):
                         st.markdown(f"{i}. [Search Reddit]({link})")
 
-                    # Auto-open the top search link
                     st.markdown(f"<meta http-equiv='refresh' content='0; URL={search_links[0]}'>", unsafe_allow_html=True)
 
-                    # Add a copy-all button
-                    all_links_text = "
-".join(search_links)
+                    all_links_text = "\n".join(search_links)
                     st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
