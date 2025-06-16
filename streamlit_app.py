@@ -70,8 +70,7 @@ def main():
                     st.download_button("📋 Copy All Search Links", data=all_links_text, file_name="reddit_search_links.txt")
 
                     top_links = search_links[:3]
-                    st.markdown("
-**🔗 Open Top 3 Results in New Tabs:**")
+                    st.markdown("**🔗 Open Top 3 Results in New Tabs:**")
                     for idx, top_link in enumerate(top_links, 1):
                         st.markdown(f"{idx}. [Open Link]({top_link})")
         else:
