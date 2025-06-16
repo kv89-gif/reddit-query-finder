@@ -21,7 +21,14 @@ def extract_top_keywords(text, top_n=10):
 
 def generate_reddit_search_links(keywords):
     base_url = "https://www.reddit.com/search/?q="
-    return [f"{base_url}{quote(kw)}" for kw in keywords]
+    phrases = []
+    # Generate combinations of 2-4 keyword phrases
+    for i in range(len(keywords)):
+        for j in range(i + 1, min(i + 4, len(keywords))):
+            phrase = " ".join(keywords[i:j+1])
+            phrases.append(phrase)
+    unique_phrases = list(dict.fromkeys(phrases))  # Remove duplicates while preserving order
+    return [f"{base_url}{quote(p)}" for p in unique_phrases]
 
 
 def main():
@@ -37,9 +44,9 @@ def main():
 
             if st.button("Show Reddit Search Links"):
                 search_links = generate_reddit_search_links(keywords)
-                st.success("Click the links below to search Reddit for each keyword:")
+                st.success("Click the links below to search Reddit for related queries:")
                 for i, link in enumerate(search_links, 1):
-                    st.markdown(f"{i}. [Search for '{keywords[i-1]}']({link})")
+                    st.markdown(f"{i}. [Search Reddit]({link})")
         else:
             st.info("Couldn’t extract meaningful keywords from the input.")
 
