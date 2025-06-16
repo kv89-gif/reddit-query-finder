@@ -28,9 +28,15 @@ def extract_top_keywords(text, top_n=10):
     return [kw[0] for kw in sorted_keywords[:top_n]]
 
 
-def search_pushshift(query, limit=10):
+def search_pushshift(query, limit=10, after_days=None, subreddit_filter=None):
     url = "https://api.pushshift.io/reddit/search/submission"
+    import time
     params = {'q': query, 'size': limit, 'sort': 'desc'}
+    if after_days:
+        after_timestamp = int(time.time()) - (after_days * 86400)
+        params['after'] = after_timestamp
+    if subreddit_filter:
+        params['subreddit'] = subreddit_filter
     try:
         response = requests.get(url, params=params, timeout=10)
         if response.status_code == 200:
@@ -56,12 +62,27 @@ def main():
     if user_text:
         keywords = extract_top_keywords(user_text)
         if keywords:
-            query = " ".join(keywords)
-            st.write(f"**Search query:** `{query}`")
+            st.write(f"**Search keywords:** {', '.join(keywords)}")
+
+            time_filter = st.selectbox("Filter posts from:", ["Any time", "Last 7 days", "Last 30 days"], index=0)
+            after_days = None
+            if time_filter == "Last 7 days":
+                after_days = 7
+            elif time_filter == "Last 30 days":
+                after_days = 30
+
+            subreddit_filter = st.text_input("Filter by subreddit (optional):")
 
             if st.button("Find Reddit Threads"):
                 with st.spinner("Searching Reddit..."):
-                    posts = search_pushshift(query)
+                    posts = []
+                    seen_urls = set()
+                    for kw in keywords:
+                        results = search_pushshift(kw, after_days=after_days, subreddit_filter=subreddit_filter if subreddit_filter else None)
+                        for r in results:
+                            if r['url'] not in seen_urls:
+                                posts.append(r)
+                                seen_urls.add(r['url'])
 
                 if posts:
                     st.success(f"Found {len(posts)} results:")
